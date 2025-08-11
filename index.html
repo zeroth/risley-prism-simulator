@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risley Prism Simulator - Discrete Beam Pointing</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Risley Prism Simulator</h1>
+        <div class="subtitle">Discrete Beam Pointing using Inverse Kinematics (Section 4.3)</div>
+    </header>
+    
+    <div class="main-container">
+        <!-- Left Panel: Controls -->
+        <div class="left-panel">
+            <!-- System Parameters -->
+            <div class="panel">
+                <div class="panel-title">System Parameters</div>
+                
+                <div class="parameter-group">
+                    <div class="parameter-label">
+                        <span>Wedge Angle (α)</span>
+                        <span class="parameter-value" id="wedgeAngleValue">11.4°</span>
+                    </div>
+                    <input type="range" id="wedgeAngle" min="5" max="20" step="0.1" value="11.367">
+                </div>
+                
+                <div class="parameter-group">
+                    <div class="parameter-label">
+                        <span>Refractive Index (n)</span>
+                        <span class="parameter-value" id="refractiveIndexValue">1.516</span>
+                    </div>
+                    <input type="range" id="refractiveIndex" min="1.4" max="1.8" step="0.001" value="1.516">
+                </div>
+                
+                <div class="parameter-group">
+                    <div class="parameter-label">
+                        <span>Prism Separation (S)</span>
+                        <span class="parameter-value" id="prismSeparationValue">10 mm</span>
+                    </div>
+                    <input type="range" id="prismSeparation" min="5" max="50" step="1" value="10">
+                </div>
+                
+                <div class="parameter-group">
+                    <div class="parameter-label">
+                        <span>Screen Distance (z)</span>
+                        <span class="parameter-value" id="screenDistanceValue">200 mm</span>
+                    </div>
+                    <input type="range" id="screenDistance" min="100" max="500" step="10" value="200">
+                </div>
+                
+                <div class="info-box">
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Max Range:</span>
+                            <span class="stat-value" id="maxRange">0 mm</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Center Defect:</span>
+                            <span class="stat-value" id="centerDefect">0 mm</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Prism Control -->
+            <div class="panel">
+                <div class="panel-title">Prism Angles</div>
+                <div class="prism-display">
+                    <div class="prism-info">
+                        <div class="prism-label">Prism 1 (θ₁)</div>
+                        <div class="prism-angle" id="theta1Display">0.0°</div>
+                    </div>
+                    <div class="prism-info">
+                        <div class="prism-label">Prism 2 (θ₂)</div>
+                        <div class="prism-angle" id="theta2Display">0.0°</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Animation Control -->
+            <div class="panel">
+                <div class="panel-title">Animation</div>
+                <div class="parameter-group">
+                    <div class="parameter-label">
+                        <span>Speed</span>
+                        <span class="parameter-value" id="animationSpeedValue">1.0x</span>
+                    </div>
+                    <input type="range" id="animationSpeed" min="0.1" max="3" step="0.1" value="1">
+                </div>
+                <div class="button-group">
+                    <button id="toggleAnimation">Start Animation</button>
+                </div>
+                <div class="info-box" style="margin-top: 10px;">
+                    <span class="stat-label">Status:</span>
+                    <span class="status-indicator inactive"></span>
+                    <span class="stat-value" id="animStatus">Off</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel: Visualization -->
+        <div class="center-panel">
+            <!-- Output View -->
+            <div class="canvas-container">
+                <canvas id="outputCanvas"></canvas>
+                <div class="coordinate-info" id="coordInfo">x: 0.0, y: 0.0 mm</div>
+            </div>
+            
+            <!-- Side View -->
+            <div class="panel side-view-panel">
+                <div class="panel-title">Side View</div>
+                <canvas id="sideViewCanvas" class="side-view-canvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Right Panel: Ray Management -->
+        <div class="right-panel">
+            <div class="panel">
+                <div class="panel-title">
+                    Ray Management
+                    <span style="float: right; color: #666; font-size: 12px;">
+                        Active: <span id="activeRays">0/10</span>
+                    </span>
+                </div>
+                
+                <button class="export-button success" id="exportData">Export Data</button>
+                
+                <div class="button-group">
+                    <button id="addRandomRay">Add Random</button>
+                    <button id="clearRays" class="danger">Clear All</button>
+                </div>
+                
+                <div style="margin-top: 15px; font-size: 12px; color: #666;">
+                    Click on the output view to add rays
+                </div>
+                
+                <div class="panel-title" style="margin-top: 20px;">Active Rays</div>
+                <div class="ray-list" id="rayList">
+                    <div style="text-align: center; color: #999; padding: 20px; font-size: 12px;">
+                        No rays added yet
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="simulator.js"></script>
+</body>
+</html>
