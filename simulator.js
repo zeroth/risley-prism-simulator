@@ -639,15 +639,34 @@ class RisleyPrismSimulator {
             ctx.lineWidth = 2;
             ctx.globalAlpha = 0.8;
             
-            // Simple ray path
+            // Calculate actual ray deflections based on prism angles
+            // Using the small angle approximation: deflection = (n-1) * wedge_angle
+            const n = this.params.refractiveIndex;
+            const wedgeAngle = this.params.wedgeAngle * Math.PI / 180;
+            
+            // Deflection vectors for each prism
+            const deflection1X = (n - 1) * wedgeAngle * Math.cos(this.prism1Angle);
+            const deflection1Y = (n - 1) * wedgeAngle * Math.sin(this.prism1Angle);
+            
+            const deflection2X = (n - 1) * wedgeAngle * Math.cos(this.prism2Angle);
+            const deflection2Y = (n - 1) * wedgeAngle * Math.sin(this.prism2Angle);
+            
+            // Total deflection in radians
+            const totalDeflectionX = deflection1X + deflection2X;
+            const totalDeflectionY = deflection1Y + deflection2Y;
+            
+            // Calculate ray path
             ctx.beginPath();
             ctx.moveTo(40, centerY);
             ctx.lineTo(prism1X, centerY);
             
-            const deflection1 = Math.sin(this.prism1Angle) * 10;
-            ctx.lineTo(prism2X, centerY + deflection1);
+            // After prism 1
+            const afterPrism1Y = centerY - deflection1Y * scale * 500;
+            ctx.lineTo(prism2X, afterPrism1Y);
             
-            const finalY = centerY - this.selectedRay.targetY * scale * 0.3;
+            // Final position on screen based on total deflection
+            const screenDistance = this.params.screenDistance * scale;
+            const finalY = centerY - totalDeflectionY * screenDistance * 10;
             ctx.lineTo(screenX, finalY);
             ctx.stroke();
             
