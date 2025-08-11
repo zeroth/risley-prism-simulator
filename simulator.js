@@ -32,11 +32,18 @@ class RisleyPrismSimulator {
         this.targetPrism1Angle = 0;
         this.targetPrism2Angle = 0;
         
-        // Colors
+        // Colorblind-friendly colors (using Paul Tol's palette and IBM Design palette)
         this.colors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
-            '#FFA07A', '#98D8C8', '#6C5CE7', '#FD79A8',
-            '#FDCB6E', '#6C63FF'
+            '#0072B2', // Blue
+            '#E69F00', // Orange
+            '#009E73', // Green
+            '#CC79A7', // Pink
+            '#56B4E9', // Sky Blue
+            '#F0E442', // Yellow
+            '#D55E00', // Vermillion
+            '#999999', // Grey
+            '#000000', // Black
+            '#661100'  // Dark Brown
         ];
         
         // Initialize
@@ -598,8 +605,8 @@ class RisleyPrismSimulator {
         ctx.save();
         ctx.translate(prism1X, centerY);
         ctx.rotate(this.prism1Angle);
-        ctx.fillStyle = 'rgba(76, 175, 80, 0.3)';
-        ctx.strokeStyle = '#4CAF50';
+        ctx.fillStyle = 'rgba(0, 114, 178, 0.3)';  // Blue with transparency
+        ctx.strokeStyle = '#0072B2';  // Blue
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(-15, -20);
@@ -615,8 +622,8 @@ class RisleyPrismSimulator {
         ctx.save();
         ctx.translate(prism2X, centerY);
         ctx.rotate(this.prism2Angle);
-        ctx.fillStyle = 'rgba(255, 152, 0, 0.3)';
-        ctx.strokeStyle = '#FF9800';
+        ctx.fillStyle = 'rgba(230, 159, 0, 0.3)';  // Orange with transparency
+        ctx.strokeStyle = '#E69F00';  // Orange
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(-15, -20);

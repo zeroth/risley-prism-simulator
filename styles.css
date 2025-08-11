@@ -97,7 +97,7 @@ h1 {
 
 .parameter-value {
     font-size: 12px;
-    color: #2196F3;
+    color: #0072B2;
     font-weight: 500;
 }
 
@@ -116,7 +116,7 @@ input[type="range"]::-webkit-slider-thumb {
     appearance: none;
     width: 16px;
     height: 16px;
-    background: #2196F3;
+    background: #0072B2;
     cursor: pointer;
     border-radius: 50%;
 }
@@ -124,7 +124,7 @@ input[type="range"]::-webkit-slider-thumb {
 input[type="range"]::-moz-range-thumb {
     width: 16px;
     height: 16px;
-    background: #2196F3;
+    background: #0072B2;
     cursor: pointer;
     border-radius: 50%;
 }
@@ -137,7 +137,7 @@ input[type="range"]::-moz-range-thumb {
 
 button {
     flex: 1;
-    background: #2196F3;
+    background: #0072B2;
     color: white;
     border: none;
     padding: 8px 12px;
@@ -149,11 +149,11 @@ button {
 }
 
 button:hover {
-    background: #1976D2;
+    background: #005A8F;
 }
 
 button:active {
-    background: #0D47A1;
+    background: #004165;
 }
 
 button:disabled {
@@ -170,11 +170,11 @@ button.secondary:hover {
 }
 
 button.danger {
-    background: #f44336;
+    background: #D55E00;
 }
 
 button.danger:hover {
-    background: #d32f2f;
+    background: #A14A00;
 }
 
 button.success {
