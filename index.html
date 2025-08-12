@@ -80,6 +80,24 @@
                 </div>
             </div>
             
+            <!-- Beam Mode -->
+            <div class="panel">
+                <div class="panel-title">Beam Mode</div>
+                <div class="beam-mode-selector">
+                    <label class="mode-option">
+                        <input type="radio" name="beamMode" value="divergent" checked>
+                        <span>Divergent</span>
+                    </label>
+                    <label class="mode-option">
+                        <input type="radio" name="beamMode" value="parallel">
+                        <span>Parallel</span>
+                    </label>
+                </div>
+                <div class="mode-description" id="modeDescription">
+                    Rays diverge naturally from the optical center
+                </div>
+            </div>
+            
             <!-- Animation Control -->
             <div class="panel">
                 <div class="panel-title">Animation</div>
@@ -131,6 +149,12 @@
                 <div class="button-group">
                     <button id="addRandomRay">Add Random</button>
                     <button id="clearRays" class="danger">Clear All</button>
+                </div>
+                
+                <div class="panel-title" style="margin-top: 15px; font-size: 11px;">Quick Patterns</div>
+                <div class="button-group">
+                    <button id="add4RaysX" class="secondary">4 Rays on X</button>
+                    <button id="add4RaysY" class="secondary">4 Rays on Y</button>
                 </div>
                 
                 <div style="margin-top: 15px; font-size: 12px; color: #666;">

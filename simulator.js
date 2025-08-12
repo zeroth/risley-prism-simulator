@@ -21,6 +21,11 @@ class RisleyPrismSimulator {
         this.selectedRay = null;
         this.hoveredPoint = null;
         
+        // Dragging state
+        this.isDragging = false;
+        this.draggedRay = null;
+        this.dragOffset = { x: 0, y: 0 };
+        
         // Animation
         this.animating = false;
         this.animationSpeed = 1;
@@ -31,6 +36,9 @@ class RisleyPrismSimulator {
         this.prism2Angle = 0;
         this.targetPrism1Angle = 0;
         this.targetPrism2Angle = 0;
+        
+        // Beam mode
+        this.beamMode = 'divergent'; // 'divergent' or 'parallel'
         
         // Colorblind-friendly colors (using Paul Tol's palette and IBM Design palette)
         this.colors = [
@@ -104,11 +112,15 @@ class RisleyPrismSimulator {
     }
     
     setupEventListeners() {
-        // Output canvas click and hover
+        // Output canvas mouse events
+        this.outputCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.outputCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.outputCanvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         this.outputCanvas.addEventListener('click', (e) => this.handleOutputClick(e));
-        this.outputCanvas.addEventListener('mousemove', (e) => this.handleOutputHover(e));
         this.outputCanvas.addEventListener('mouseleave', () => {
             this.hoveredPoint = null;
+            this.isDragging = false;
+            this.draggedRay = null;
             document.getElementById('coordInfo').textContent = 'x: 0.0, y: 0.0 mm';
         });
         
@@ -149,30 +161,35 @@ class RisleyPrismSimulator {
         document.getElementById('clearRays').addEventListener('click', () => this.clearAllRays());
         document.getElementById('addRandomRay').addEventListener('click', () => this.addRandomRay());
         document.getElementById('exportData').addEventListener('click', () => this.exportData());
+        document.getElementById('add4RaysX').addEventListener('click', () => this.add4RaysOnAxis('x'));
+        document.getElementById('add4RaysY').addEventListener('click', () => this.add4RaysOnAxis('y'));
         document.getElementById('toggleAnimation').addEventListener('click', (e) => {
             this.animating = !this.animating;
             e.target.textContent = this.animating ? 'Stop Animation' : 'Start Animation';
             document.getElementById('animStatus').textContent = this.animating ? 'On' : 'Off';
         });
+        
+        // Beam mode selector
+        document.querySelectorAll('input[name="beamMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.beamMode = e.target.value;
+                const descEl = document.getElementById('modeDescription');
+                if (this.beamMode === 'parallel') {
+                    descEl.textContent = 'All rays exit parallel to the optical axis (no angular deviation)';
+                } else {
+                    descEl.textContent = 'Rays diverge naturally from the optical center';
+                }
+                // Recalculate all rays for the new mode
+                if (this.beamMode === 'parallel') {
+                    this.applyParallelMode();
+                } else {
+                    this.recalculateAllRays();
+                }
+            });
+        });
     }
     
-    handleOutputClick(event) {
-        const rect = this.outputCanvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        
-        // Convert to mm coordinates
-        const centerX = this.outputCanvas.width / 2;
-        const centerY = this.outputCanvas.height / 2;
-        const scale = (this.outputCanvas.width - 60) / (2 * this.rmax * 1.2);
-        
-        const xmm = (x - centerX) / scale;
-        const ymm = -(y - centerY) / scale;  // Flip y-axis
-        
-        this.addRay(xmm, ymm);
-    }
-    
-    handleOutputHover(event) {
+    handleMouseDown(event) {
         const rect = this.outputCanvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
@@ -185,8 +202,133 @@ class RisleyPrismSimulator {
         const xmm = (x - centerX) / scale;
         const ymm = -(y - centerY) / scale;
         
+        // Check if we're clicking on a ray point
+        const clickRadius = 10 / scale; // 10 pixel radius for clicking
+        for (let ray of this.rays) {
+            const distance = Math.sqrt(
+                Math.pow(ray.targetX - xmm, 2) + 
+                Math.pow(ray.targetY - ymm, 2)
+            );
+            if (distance < clickRadius) {
+                this.isDragging = true;
+                this.draggedRay = ray;
+                this.dragOffset.x = xmm - ray.targetX;
+                this.dragOffset.y = ymm - ray.targetY;
+                this.selectRay(ray);
+                event.preventDefault();
+                return;
+            }
+        }
+    }
+    
+    handleMouseMove(event) {
+        const rect = this.outputCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        // Convert to mm coordinates
+        const centerX = this.outputCanvas.width / 2;
+        const centerY = this.outputCanvas.height / 2;
+        const scale = (this.outputCanvas.width - 60) / (2 * this.rmax * 1.2);
+        
+        const xmm = (x - centerX) / scale;
+        const ymm = -(y - centerY) / scale;
+        
+        if (this.isDragging && this.draggedRay) {
+            // Update ray position
+            const newX = xmm - this.dragOffset.x;
+            const newY = ymm - this.dragOffset.y;
+            
+            // Check if new position is valid
+            const radius = Math.sqrt(newX * newX + newY * newY);
+            if (radius > this.rd && radius < this.rmax) {
+                this.draggedRay.targetX = newX;
+                this.draggedRay.targetY = newY;
+                
+                // Recalculate prism angles for new position
+                const angles = this.calculatePrismAngles(newX, newY);
+                this.draggedRay.theta1 = angles.theta1;
+                this.draggedRay.theta2 = angles.theta2;
+                
+                // Update prism angles if this is the selected ray
+                if (this.draggedRay === this.selectedRay) {
+                    this.targetPrism1Angle = angles.theta1;
+                    this.targetPrism2Angle = angles.theta2;
+                    document.getElementById('theta1Display').textContent = 
+                        (angles.theta1 * 180 / Math.PI).toFixed(2) + '°';
+                    document.getElementById('theta2Display').textContent = 
+                        (angles.theta2 * 180 / Math.PI).toFixed(2) + '°';
+                }
+                
+                this.updateRayList();
+            }
+            
+            // Update cursor style
+            this.outputCanvas.style.cursor = 'grabbing';
+        } else {
+            // Check if hovering over a ray point
+            const hoverRadius = 10 / scale;
+            let hovering = false;
+            for (let ray of this.rays) {
+                const distance = Math.sqrt(
+                    Math.pow(ray.targetX - xmm, 2) + 
+                    Math.pow(ray.targetY - ymm, 2)
+                );
+                if (distance < hoverRadius) {
+                    this.outputCanvas.style.cursor = 'grab';
+                    hovering = true;
+                    break;
+                }
+            }
+            if (!hovering) {
+                this.outputCanvas.style.cursor = 'crosshair';
+            }
+        }
+        
         this.hoveredPoint = { x: xmm, y: ymm };
         document.getElementById('coordInfo').textContent = `x: ${xmm.toFixed(1)}, y: ${ymm.toFixed(1)} mm`;
+    }
+    
+    handleMouseUp(event) {
+        if (this.isDragging) {
+            this.isDragging = false;
+            this.draggedRay = null;
+            this.outputCanvas.style.cursor = 'crosshair';
+            event.preventDefault();
+        }
+    }
+    
+    handleOutputClick(event) {
+        // Only add new ray if not dragging
+        if (this.isDragging) return;
+        
+        const rect = this.outputCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        // Convert to mm coordinates
+        const centerX = this.outputCanvas.width / 2;
+        const centerY = this.outputCanvas.height / 2;
+        const scale = (this.outputCanvas.width - 60) / (2 * this.rmax * 1.2);
+        
+        const xmm = (x - centerX) / scale;
+        const ymm = -(y - centerY) / scale;
+        
+        // Check if clicking on existing ray
+        const clickRadius = 10 / scale;
+        for (let ray of this.rays) {
+            const distance = Math.sqrt(
+                Math.pow(ray.targetX - xmm, 2) + 
+                Math.pow(ray.targetY - ymm, 2)
+            );
+            if (distance < clickRadius) {
+                this.selectRay(ray);
+                return;
+            }
+        }
+        
+        // Add new ray if not clicking on existing one
+        this.addRay(xmm, ymm);
     }
     
     addRay(x, y) {
@@ -205,7 +347,10 @@ class RisleyPrismSimulator {
             return;
         }
         
-        const angles = this.calculatePrismAngles(x, y);
+        // Calculate angles based on current beam mode
+        const angles = this.beamMode === 'parallel' ? 
+            this.calculateParallelModeAngles(x, y) : 
+            this.calculatePrismAngles(x, y);
         
         const ray = {
             id: Date.now(),
@@ -287,6 +432,62 @@ class RisleyPrismSimulator {
         this.addRay(x, y);
     }
     
+    add4RaysOnAxis(axis) {
+        // Clear existing rays first
+        this.clearAllRays();
+        
+        // Calculate evenly spaced positions from center
+        // Use 70% of the maximum range to ensure rays are well within bounds
+        const maxRange = this.rmax * 0.7;
+        const minRange = this.rd * 1.5; // Stay outside center defect
+        
+        // Create 2 positions on positive side, evenly spaced
+        const range = maxRange - minRange;
+        const spacing = range / 3; // Divide range into 3 parts for 2 rays
+        
+        const position1 = minRange + spacing;     // First ray, closer to center
+        const position2 = minRange + spacing * 2; // Second ray, further from center
+        
+        // Create rays directly with proper beam mode calculation
+        const positions = [];
+        if (axis === 'x') {
+            positions.push({ x: position1, y: 0 });
+            positions.push({ x: position2, y: 0 });
+            positions.push({ x: -position1, y: 0 });
+            positions.push({ x: -position2, y: 0 });
+        } else if (axis === 'y') {
+            positions.push({ x: 0, y: position1 });
+            positions.push({ x: 0, y: position2 });
+            positions.push({ x: 0, y: -position1 });
+            positions.push({ x: 0, y: -position2 });
+        }
+        
+        // Add rays with unique IDs and proper beam mode
+        positions.forEach((pos, index) => {
+            // Calculate angles based on current beam mode
+            const angles = this.beamMode === 'parallel' ? 
+                this.calculateParallelModeAngles(pos.x, pos.y) : 
+                this.calculatePrismAngles(pos.x, pos.y);
+            
+            const ray = {
+                id: Date.now() + index, // Ensure unique IDs
+                targetX: pos.x,
+                targetY: pos.y,
+                theta1: angles.theta1,
+                theta2: angles.theta2,
+                color: this.colors[this.rays.length % this.colors.length],
+            };
+            
+            this.rays.push(ray);
+        });
+        
+        // Update display and select first ray
+        this.updateRayList();
+        if (this.rays.length > 0) {
+            this.selectRay(this.rays[0]);
+        }
+    }
+    
     exportData() {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `risley_prism_data_${timestamp}.txt`;
@@ -310,6 +511,12 @@ class RisleyPrismSimulator {
         content += `Center Defect Radius (r_d): ${this.rd.toFixed(3)} mm\n`;
         content += `Beam Steering Radius 1 (r_1): ${this.r1.toFixed(3)} mm\n`;
         content += `Beam Steering Radius 2 (r_2): ${this.r2.toFixed(3)} mm\n\n`;
+        
+        content += '--- BEAM MODE ---\n';
+        content += `Current Mode: ${this.beamMode.charAt(0).toUpperCase() + this.beamMode.slice(1)}\n`;
+        content += this.beamMode === 'parallel' ? 
+            'Description: All rays exit parallel to the optical axis (no angular deviation)\n\n' :
+            'Description: Rays diverge naturally from the optical center\n\n';
         
         content += '--- ACTIVE RAYS ---\n';
         if (this.rays.length === 0) {
@@ -351,6 +558,46 @@ class RisleyPrismSimulator {
         
         // Show confirmation
         alert(`Data exported successfully as ${filename}`);
+    }
+    
+    updateRayTarget(rayIndex, axis, newValue) {
+        const ray = this.rays[rayIndex];
+        if (!ray) return;
+        
+        const value = parseFloat(newValue);
+        if (isNaN(value)) return;
+        
+        // Update target position
+        if (axis === 'x') {
+            ray.targetX = value;
+        } else if (axis === 'y') {
+            ray.targetY = value;
+        }
+        
+        // Check if position is valid
+        const radius = Math.sqrt(ray.targetX * ray.targetX + ray.targetY * ray.targetY);
+        if (radius <= this.rd || radius >= this.rmax) {
+            // Position is out of bounds, revert
+            this.updateRayList();
+            return;
+        }
+        
+        // Recalculate prism angles for new position
+        const angles = this.calculatePrismAngles(ray.targetX, ray.targetY);
+        ray.theta1 = angles.theta1;
+        ray.theta2 = angles.theta2;
+        
+        // Update display if this is the selected ray
+        if (ray === this.selectedRay) {
+            this.targetPrism1Angle = ray.theta1;
+            this.targetPrism2Angle = ray.theta2;
+            document.getElementById('theta1Display').textContent = 
+                (ray.theta1 * 180 / Math.PI).toFixed(2) + '°';
+            document.getElementById('theta2Display').textContent = 
+                (ray.theta2 * 180 / Math.PI).toFixed(2) + '°';
+        }
+        
+        this.updateRayList();
     }
     
     updateRayAngleDegrees(rayIndex, prismNumber, newValueDegrees) {
@@ -445,9 +692,17 @@ class RisleyPrismSimulator {
     
     recalculateAllRays() {
         this.rays.forEach(ray => {
-            const angles = this.calculatePrismAngles(ray.targetX, ray.targetY);
-            ray.theta1 = angles.theta1;
-            ray.theta2 = angles.theta2;
+            if (this.beamMode === 'parallel') {
+                // In parallel mode, calculate angles for parallel output
+                const angles = this.calculateParallelModeAngles(ray.targetX, ray.targetY);
+                ray.theta1 = angles.theta1;
+                ray.theta2 = angles.theta2;
+            } else {
+                // In divergent mode, use standard calculation
+                const angles = this.calculatePrismAngles(ray.targetX, ray.targetY);
+                ray.theta1 = angles.theta1;
+                ray.theta2 = angles.theta2;
+            }
         });
         if (this.selectedRay) {
             this.targetPrism1Angle = this.selectedRay.theta1;
@@ -457,6 +712,70 @@ class RisleyPrismSimulator {
             document.getElementById('theta2Display').textContent = 
                 (this.selectedRay.theta2 * 180 / Math.PI).toFixed(2) + '°';
         }
+        this.updateRayList();
+    }
+    
+    applyParallelMode() {
+        // Apply parallel mode to all rays
+        this.rays.forEach(ray => {
+            const angles = this.calculateParallelModeAngles(ray.targetX, ray.targetY);
+            ray.theta1 = angles.theta1;
+            ray.theta2 = angles.theta2;
+        });
+        
+        if (this.selectedRay) {
+            this.targetPrism1Angle = this.selectedRay.theta1;
+            this.targetPrism2Angle = this.selectedRay.theta2;
+            document.getElementById('theta1Display').textContent = 
+                (this.selectedRay.theta1 * 180 / Math.PI).toFixed(2) + '°';
+            document.getElementById('theta2Display').textContent = 
+                (this.selectedRay.theta2 * 180 / Math.PI).toFixed(2) + '°';
+        }
+        
+        this.updateRayList();
+    }
+    
+    calculateParallelModeAngles(targetX, targetY) {
+        // For parallel mode, we want rays to exit parallel to the optical axis
+        // This requires the prisms to create a lateral displacement without angular deviation
+        // The key is that the prisms must be oriented to create equal and opposite angular deviations
+        // that cancel out, leaving only lateral displacement
+        
+        const n = this.params.refractiveIndex;
+        const alpha = this.params.wedgeAngle;
+        const deflectionFactor = (n - 1) * alpha;
+        
+        // Calculate the required lateral displacement
+        const targetRadius = Math.sqrt(targetX * targetX + targetY * targetY);
+        const targetAngle = Math.atan2(targetY, targetX);
+        
+        // For a ray to exit parallel to the optical axis after passing through both prisms:
+        // The angular deviations from both prisms must cancel out
+        // But their lateral displacements must add up to reach the target
+        
+        // The optimal configuration is to have the prisms oriented at angles that:
+        // 1. Create the required lateral displacement
+        // 2. Cancel angular deviations
+        
+        // For parallel output to optical axis, we need:
+        // - Prism 1 creates deflection in one direction
+        // - Prism 2 creates equal deflection in opposite direction relative to beam path
+        // - Net result: lateral displacement with no angular deviation
+        
+        // Calculate required deflection magnitude
+        const requiredDeflection = targetRadius / this.params.screenDistance;
+        
+        // For two prisms to create lateral displacement while maintaining parallel output:
+        // They should be oriented at supplementary angles that create the displacement
+        const deflectionAngle = requiredDeflection / (2 * deflectionFactor);
+        
+        // Prism 1: oriented to deflect toward target
+        const theta1 = targetAngle - deflectionAngle;
+        
+        // Prism 2: oriented to correct the angle while maintaining displacement
+        const theta2 = targetAngle + deflectionAngle;
+        
+        return { theta1, theta2 };
     }
     
     updateRayList() {
@@ -478,31 +797,54 @@ class RisleyPrismSimulator {
                  onclick="simulator.selectRay(simulator.rays[${index}])">
                 <div class="ray-info">
                     <div style="font-weight: 500;">Ray ${index + 1}</div>
-                    <div class="ray-coords">
-                        Target: (${ray.targetX.toFixed(1)}, ${ray.targetY.toFixed(1)}) mm
+                    <div class="ray-target-edit">
+                        <div class="target-control">
+                            <label>X:</label>
+                            <input type="number" 
+                                   class="target-input" 
+                                   value="${ray.targetX.toFixed(2)}" 
+                                   step="0.1" 
+                                   onclick="event.stopPropagation()"
+                                   onkeydown="event.stopPropagation()"
+                                   oninput="simulator.updateRayTarget(${index}, 'x', this.value)">
+                            <span class="unit-label">mm</span>
+                        </div>
+                        <div class="target-control">
+                            <label>Y:</label>
+                            <input type="number" 
+                                   class="target-input" 
+                                   value="${ray.targetY.toFixed(2)}" 
+                                   step="0.1" 
+                                   onclick="event.stopPropagation()"
+                                   onkeydown="event.stopPropagation()"
+                                   oninput="simulator.updateRayTarget(${index}, 'y', this.value)">
+                            <span class="unit-label">mm</span>
+                        </div>
                     </div>
                     <div class="ray-angles-edit">
                         <div class="angle-control">
                             <label>θ₁:</label>
                             <input type="number" 
                                    class="angle-input" 
-                                   value="${(ray.theta1 * 180 / Math.PI).toFixed(2)}" 
-                                   step="0.01" 
+                                   value="${ray.theta1.toFixed(4)}" 
+                                   step="0.0001" 
                                    onclick="event.stopPropagation()"
                                    onkeydown="event.stopPropagation()"
-                                   oninput="simulator.updateRayAngleDegrees(${index}, 1, this.value)">
-                            <span class="angle-deg">° (${ray.theta1.toFixed(4)} rad)</span>
+                                   oninput="simulator.updateRayAngle(${index}, 1, this.value)">
+                            <span class="unit-label">rad</span>
+                            <span class="angle-deg">(${(ray.theta1 * 180 / Math.PI).toFixed(2)}°)</span>
                         </div>
                         <div class="angle-control">
                             <label>θ₂:</label>
                             <input type="number" 
                                    class="angle-input" 
-                                   value="${(ray.theta2 * 180 / Math.PI).toFixed(2)}" 
-                                   step="0.01" 
+                                   value="${ray.theta2.toFixed(4)}" 
+                                   step="0.0001" 
                                    onclick="event.stopPropagation()"
                                    onkeydown="event.stopPropagation()"
-                                   oninput="simulator.updateRayAngleDegrees(${index}, 2, this.value)">
-                            <span class="angle-deg">° (${ray.theta2.toFixed(4)} rad)</span>
+                                   oninput="simulator.updateRayAngle(${index}, 2, this.value)">
+                            <span class="unit-label">rad</span>
+                            <span class="angle-deg">(${(ray.theta2 * 180 / Math.PI).toFixed(2)}°)</span>
                         </div>
                     </div>
                 </div>
@@ -642,16 +984,34 @@ class RisleyPrismSimulator {
             const x = centerX + ray.targetX * scale;
             const y = centerY - ray.targetY * scale;  // Flip y-axis
             
+            // Check if this ray is being dragged
+            const isDragged = ray === this.draggedRay && this.isDragging;
+            
+            // Add shadow effect for dragged ray
+            if (isDragged) {
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+            }
+            
             ctx.fillStyle = ray.color;
             ctx.beginPath();
-            ctx.arc(x, y, ray === this.selectedRay ? 6 : 4, 0, Math.PI * 2);
+            ctx.arc(x, y, ray === this.selectedRay ? 7 : 5, 0, Math.PI * 2);
             ctx.fill();
             
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            // Draw selection ring
             if (ray === this.selectedRay) {
                 ctx.strokeStyle = ray.color;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.arc(x, y, 12, 0, Math.PI * 2);
                 ctx.stroke();
                 
                 // Show coordinates
@@ -659,7 +1019,30 @@ class RisleyPrismSimulator {
                 ctx.font = '11px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText(`(${ray.targetX.toFixed(1)}, ${ray.targetY.toFixed(1)})`, 
-                           x, y - 15);
+                           x, y - 18);
+            }
+            
+            // Draw drag indicator ring for draggable rays
+            if (!isDragged) {
+                // Check if mouse is near this ray
+                if (this.hoveredPoint) {
+                    const distance = Math.sqrt(
+                        Math.pow(ray.targetX - this.hoveredPoint.x, 2) + 
+                        Math.pow(ray.targetY - this.hoveredPoint.y, 2)
+                    );
+                    const hoverRadius = 10 / scale;
+                    if (distance < hoverRadius) {
+                        ctx.strokeStyle = ray.color;
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([3, 3]);
+                        ctx.globalAlpha = 0.5;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 15, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.globalAlpha = 1;
+                    }
+                }
             }
         });
         

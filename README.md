@@ -81,21 +81,121 @@ Given a target position (x, y) on the screen, the required prism angles are calc
 
 Where r = √(x² + y²) is the target radius.
 
+## Beam Modes
+
+The simulator supports two distinct beam propagation modes that determine how the prisms are controlled:
+
+### Divergent Mode (Default)
+In divergent mode, rays naturally diverge from the optical center, similar to how light spreads from a point source.
+
+**Characteristics:**
+- Each ray has independently calculated prism angles (θ₁ ≠ θ₂ in most cases)
+- Prisms rotate to different angles to steer the beam to the target
+- The output beam diverges at an angle determined by the target position
+- Mimics natural beam propagation through optical systems
+- Best for applications where beam divergence is acceptable or desired
+
+**Use Cases:**
+- Laser marking or engraving systems
+- Scanning applications where divergence is not critical
+- Target tracking systems
+- General beam steering applications
+
+**Physics:**
+In this mode, the two prisms work together with different rotation angles to both deflect and steer the beam. The combination of different prism angles creates a net deflection that positions the beam at the target while allowing natural divergence.
+
+### Parallel Mode
+In parallel mode, all output rays exit parallel to the optical axis (center axis), creating beams with no angular deviation regardless of their target position.
+
+**Characteristics:**
+- Prisms rotate to complementary angles (θ₁ ≠ θ₂) that cancel angular deviation
+- All output beams are parallel to the optical axis (0° angle of propagation)
+- The beam is laterally displaced to reach the target position
+- No angular deviation is introduced - pure lateral translation
+- Every ray travels straight forward after exiting the prism system
+
+**Visual Representation:**
+```
+Side View - Parallel Mode:
+        P1    P2       Screen
+Light → ═╗    ╔═ → ═══ → Target (0, 20)
+         ║    ║
+Light → ═╝    ╚═ → ═══ → Target (0, -20)
+
+All exit rays are parallel to the optical axis (horizontal lines)
+```
+
+**Use Cases:**
+- Telecentric imaging systems where rays must be perpendicular to the image plane
+- Lithography and semiconductor inspection requiring perpendicular incidence
+- Metrology systems needing consistent beam angles
+- Parallel processing systems where multiple beams must maintain the same direction
+- Applications where angular deviation would cause distortion or measurement errors
+
+**Physics:**
+In this mode, the two prisms are oriented at carefully calculated angles where:
+1. **Prism 1** deflects the beam at an angle toward the target
+2. **Prism 2** deflects the beam by an equal but opposite angle to cancel the angular deviation
+3. The net result is lateral displacement without angular change
+
+The prism angles are calculated such that:
+- θ₁ = target_angle - deflection_offset
+- θ₂ = target_angle + deflection_offset
+
+This configuration ensures that while the beam is displaced laterally to reach the target position, it exits parallel to the optical axis with zero angular deviation.
+
+### Mode Comparison
+
+| Aspect | Divergent Mode | Parallel Mode |
+|--------|---------------|---------------|
+| **Exit Angle** | Varies with position | Always 0° (parallel to axis) |
+| **Prism Angles** | Usually θ₁ ≠ θ₂ | Always θ₁ ≠ θ₂ (complementary) |
+| **Beam Path** | Angled trajectory | Straight forward trajectory |
+| **Application** | General scanning | Telecentric systems |
+| **Spot Size** | Varies with angle | Consistent across field |
+| **Example θ₁, θ₂** | 45°, 135° | 40°, 50° |
+
+### Mode Selection Impact
+
+**On Ray Management:**
+- When switching modes, all existing rays are automatically recalculated
+- New rays added will follow the selected mode's calculation method
+- The mode affects both manual ray placement and programmatic patterns
+
+**On Prism Control:**
+- **Divergent Mode:** Prisms rotate independently to achieve optimal beam steering with natural divergence
+- **Parallel Mode:** Prisms rotate to complementary angles that cancel angular deviation while maintaining position
+
+**Visual Indicators:**
+- The mode description updates in real-time
+- Prism angle displays show the calculated values for each mode
+- The side view visualization reflects the beam propagation characteristics
+- In parallel mode, all rays should appear parallel to the optical axis in the side view
+
 ## Usage
 
-1. **Adjust System Parameters:** Use the sliders to modify wedge angle, refractive index, prism separation, and screen distance.
+1. **Select Beam Mode:** Choose between Divergent (default) or Parallel mode based on your application requirements.
 
-2. **Add Target Points:** Click anywhere on the output view grid to add a target point. The simulator will automatically calculate the required prism angles.
+2. **Adjust System Parameters:** Use the sliders to modify wedge angle, refractive index, prism separation, and screen distance.
 
-3. **Manage Rays:** 
+3. **Add Target Points:** Click anywhere on the output view grid to add a target point. The simulator will automatically calculate the required prism angles based on the selected mode.
+
+4. **Manage Rays:** 
    - Add up to 10 simultaneous target points
    - Each ray is color-coded for easy identification
    - Click on a ray in the list to select it
+   - Drag ray points to reposition them
+   - Edit target positions (X, Y) directly in the ray list
+   - Adjust prism angles (θ₁, θ₂) manually in radians with degree display
    - Remove individual rays with the × button
 
-4. **Animation:** Enable animation to see smooth transitions between target positions.
+5. **Quick Patterns:** Use convenience buttons to add pre-configured ray patterns:
+   - "4 Rays on X" - Creates 4 evenly spaced rays along the X-axis
+   - "4 Rays on Y" - Creates 4 evenly spaced rays along the Y-axis
 
-5. **Export Data:** Click "Export Data" to save all system parameters and ray information to a text file for analysis.
+6. **Animation:** Enable animation to see smooth transitions between target positions.
+
+7. **Export Data:** Click "Export Data" to save all system parameters and ray information (including both degrees and radians) to a text file for analysis.
 
 ## Limitations
 
