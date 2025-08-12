@@ -257,6 +257,45 @@ canvas {
     margin-right: 8px;
 }
 
+.ray-angles-edit {
+    margin-top: 8px;
+    font-size: 11px;
+}
+
+.angle-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.angle-control label {
+    color: #666;
+    font-weight: 500;
+    min-width: 25px;
+}
+
+.angle-input {
+    width: 80px;
+    padding: 3px 6px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 11px;
+    background: white;
+}
+
+.angle-input:focus {
+    outline: none;
+    border-color: #0072B2;
+    box-shadow: 0 0 0 2px rgba(0, 114, 178, 0.1);
+}
+
+.angle-deg {
+    color: #888;
+    font-size: 10px;
+    min-width: 80px;
+}
+
 .ray-remove {
     background: transparent;
     color: #f44336;

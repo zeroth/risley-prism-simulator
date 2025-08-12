@@ -316,8 +316,8 @@ class RisleyPrismSimulator {
             content += 'No active rays\n';
         } else {
             content += `Total Active Rays: ${this.rays.length}\n\n`;
-            content += 'Ray#\tTarget_X(mm)\tTarget_Y(mm)\tRadius(mm)\tTheta1(deg)\tTheta2(deg)\tColor\n';
-            content += '----\t------------\t------------\t----------\t-----------\t-----------\t-----\n';
+            content += 'Ray#\tTarget_X(mm)\tTarget_Y(mm)\tRadius(mm)\tTheta1(deg)\tTheta1(rad)\tTheta2(deg)\tTheta2(rad)\tColor\n';
+            content += '----\t------------\t------------\t----------\t-----------\t-----------\t-----------\t-----------\t-----\n';
             
             this.rays.forEach((ray, index) => {
                 const radius = Math.sqrt(ray.targetX * ray.targetX + ray.targetY * ray.targetY);
@@ -326,7 +326,9 @@ class RisleyPrismSimulator {
                 content += `${ray.targetY.toFixed(3)}\t\t`;
                 content += `${radius.toFixed(3)}\t\t`;
                 content += `${(ray.theta1 * 180 / Math.PI).toFixed(3)}\t\t`;
+                content += `${ray.theta1.toFixed(4)}\t\t`;
                 content += `${(ray.theta2 * 180 / Math.PI).toFixed(3)}\t\t`;
+                content += `${ray.theta2.toFixed(4)}\t\t`;
                 content += `${ray.color}\n`;
             });
         }
@@ -351,6 +353,96 @@ class RisleyPrismSimulator {
         alert(`Data exported successfully as ${filename}`);
     }
     
+    updateRayAngleDegrees(rayIndex, prismNumber, newValueDegrees) {
+        const ray = this.rays[rayIndex];
+        if (!ray) return;
+        
+        const angleInDegrees = parseFloat(newValueDegrees);
+        if (isNaN(angleInDegrees)) return;
+        
+        // Convert degrees to radians
+        const angleInRadians = angleInDegrees * Math.PI / 180;
+        
+        if (prismNumber === 1) {
+            ray.theta1 = angleInRadians;
+        } else if (prismNumber === 2) {
+            ray.theta2 = angleInRadians;
+        }
+        
+        // Recalculate the target position based on new angles
+        const { x, y } = this.calculateTargetFromAngles(ray.theta1, ray.theta2);
+        ray.targetX = x;
+        ray.targetY = y;
+        
+        // Update display if this is the selected ray
+        if (ray === this.selectedRay) {
+            this.targetPrism1Angle = ray.theta1;
+            this.targetPrism2Angle = ray.theta2;
+            document.getElementById('theta1Display').textContent = 
+                (ray.theta1 * 180 / Math.PI).toFixed(2) + '°';
+            document.getElementById('theta2Display').textContent = 
+                (ray.theta2 * 180 / Math.PI).toFixed(2) + '°';
+        }
+        
+        this.updateRayList();
+    }
+    
+    updateRayAngle(rayIndex, prismNumber, newValue) {
+        const ray = this.rays[rayIndex];
+        if (!ray) return;
+        
+        const angleInRadians = parseFloat(newValue);
+        if (isNaN(angleInRadians)) return;
+        
+        if (prismNumber === 1) {
+            ray.theta1 = angleInRadians;
+        } else if (prismNumber === 2) {
+            ray.theta2 = angleInRadians;
+        }
+        
+        // Recalculate the target position based on new angles
+        const { x, y } = this.calculateTargetFromAngles(ray.theta1, ray.theta2);
+        ray.targetX = x;
+        ray.targetY = y;
+        
+        // Update display if this is the selected ray
+        if (ray === this.selectedRay) {
+            this.targetPrism1Angle = ray.theta1;
+            this.targetPrism2Angle = ray.theta2;
+            document.getElementById('theta1Display').textContent = 
+                (ray.theta1 * 180 / Math.PI).toFixed(2) + '°';
+            document.getElementById('theta2Display').textContent = 
+                (ray.theta2 * 180 / Math.PI).toFixed(2) + '°';
+        }
+        
+        this.updateRayList();
+    }
+    
+    calculateTargetFromAngles(theta1, theta2) {
+        // Forward kinematics: calculate target position from prism angles
+        const n = this.params.refractiveIndex;
+        const alpha = this.params.wedgeAngle;
+        
+        // Using small angle approximation
+        const deflectionFactor = (n - 1) * alpha;
+        
+        // Calculate deflection vectors
+        const d1x = deflectionFactor * Math.cos(theta1);
+        const d1y = deflectionFactor * Math.sin(theta1);
+        const d2x = deflectionFactor * Math.cos(theta2);
+        const d2y = deflectionFactor * Math.sin(theta2);
+        
+        // Total deflection
+        const totalDeflectionX = d1x + d2x;
+        const totalDeflectionY = d1y + d2y;
+        
+        // Calculate position on screen
+        const x = totalDeflectionX * this.params.screenDistance;
+        const y = totalDeflectionY * this.params.screenDistance;
+        
+        return { x, y };
+    }
+    
     recalculateAllRays() {
         this.rays.forEach(ray => {
             const angles = this.calculatePrismAngles(ray.targetX, ray.targetY);
@@ -361,9 +453,9 @@ class RisleyPrismSimulator {
             this.targetPrism1Angle = this.selectedRay.theta1;
             this.targetPrism2Angle = this.selectedRay.theta2;
             document.getElementById('theta1Display').textContent = 
-                (this.selectedRay.theta1 * 180 / Math.PI).toFixed(1) + '°';
+                (this.selectedRay.theta1 * 180 / Math.PI).toFixed(2) + '°';
             document.getElementById('theta2Display').textContent = 
-                (this.selectedRay.theta2 * 180 / Math.PI).toFixed(1) + '°';
+                (this.selectedRay.theta2 * 180 / Math.PI).toFixed(2) + '°';
         }
     }
     
@@ -389,9 +481,29 @@ class RisleyPrismSimulator {
                     <div class="ray-coords">
                         Target: (${ray.targetX.toFixed(1)}, ${ray.targetY.toFixed(1)}) mm
                     </div>
-                    <div class="ray-angles">
-                        <span>θ₁: ${(ray.theta1 * 180 / Math.PI).toFixed(1)}°</span>
-                        <span>θ₂: ${(ray.theta2 * 180 / Math.PI).toFixed(1)}°</span>
+                    <div class="ray-angles-edit">
+                        <div class="angle-control">
+                            <label>θ₁:</label>
+                            <input type="number" 
+                                   class="angle-input" 
+                                   value="${(ray.theta1 * 180 / Math.PI).toFixed(2)}" 
+                                   step="0.01" 
+                                   onclick="event.stopPropagation()"
+                                   onkeydown="event.stopPropagation()"
+                                   oninput="simulator.updateRayAngleDegrees(${index}, 1, this.value)">
+                            <span class="angle-deg">° (${ray.theta1.toFixed(4)} rad)</span>
+                        </div>
+                        <div class="angle-control">
+                            <label>θ₂:</label>
+                            <input type="number" 
+                                   class="angle-input" 
+                                   value="${(ray.theta2 * 180 / Math.PI).toFixed(2)}" 
+                                   step="0.01" 
+                                   onclick="event.stopPropagation()"
+                                   onkeydown="event.stopPropagation()"
+                                   oninput="simulator.updateRayAngleDegrees(${index}, 2, this.value)">
+                            <span class="angle-deg">° (${ray.theta2.toFixed(4)} rad)</span>
+                        </div>
                     </div>
                 </div>
                 <button class="ray-remove" onclick="event.stopPropagation(); simulator.removeRay(${ray.id})">×</button>
